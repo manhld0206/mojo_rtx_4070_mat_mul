@@ -1,16 +1,3 @@
-# ===----------------------------------------------------------------------=== #
-# Copyright (c) 2026, Modular Inc. All rights reserved.
-#
-# Licensed under the Apache License v2.0 with LLVM Exceptions:
-# https://llvm.org/LICENSE.txt
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ===----------------------------------------------------------------------=== #
-
 from std.math import ceildiv
 from std.sys import argv
 
@@ -79,9 +66,9 @@ def benchmark_kernel(M: Int, N: Int, K: Int, ctx: DeviceContext) raises:
     b = LayoutTensor[DType.bfloat16, Layout2D, MutAnyOrigin](d_b, b_layout)
     c = LayoutTensor[DType.bfloat16, Layout2D, MutAnyOrigin](d_c, c_layout)
 
+    comptime BLOCKSIZE = 16
     comptime kernel = matmul_kernel[BLOCKSIZE=BLOCKSIZE]
     # Use 1D thread block for memory coalescing
-    comptime BLOCKSIZE = 32
 
     ctx.enqueue_function[kernel, kernel](
         c,
@@ -93,7 +80,7 @@ def benchmark_kernel(M: Int, N: Int, K: Int, ctx: DeviceContext) raises:
 
     ctx.synchronize()
 
-    comptime num_runs = 10
+    comptime num_runs = 4
     comptime num_warmup = 2
 
     @always_inline

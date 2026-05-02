@@ -1,16 +1,3 @@
-# ===----------------------------------------------------------------------=== #
-# Copyright (c) 2026, Modular Inc. All rights reserved.
-#
-# Licensed under the Apache License v2.0 with LLVM Exceptions:
-# https://llvm.org/LICENSE.txt
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ===----------------------------------------------------------------------=== #
-
 from std.math import ceildiv
 from std.sys import argv
 
@@ -28,7 +15,7 @@ comptime Layout2D = Layout.row_major(UNKNOWN_VALUE, UNKNOWN_VALUE)
 
 
 def matmul_kernel[
-    BLOCKSIZE: Int = 32,
+    BLOCKSIZE: Int = 16,
     SIMD_WIDTH: Int = 4,
 ](
     c: LayoutTensor[DType.bfloat16, Layout2D, MutAnyOrigin],
@@ -57,31 +44,26 @@ def matmul_kernel[
         address_space=AddressSpace.SHARED,
     ].stack_allocation()
 
-    comptime thread_layout = Layout.row_major(BLOCKSIZE, BLOCKSIZE // SIMD_WIDTH)
-
     var c_val: Float32 = 0
 
     for i in range(ceildiv(K, BLOCKSIZE)):
         a_tile = a.tile[BLOCKSIZE, BLOCKSIZE](block_idx.y, i)
-        a_tile_segment = a_tile.vectorize[1, SIMD_WIDTH]().distribute[
-            thread_layout
-        ](tid)
-        a_shared_segment = a_tile_s.vectorize[1, SIMD_WIDTH]().distribute[
-            thread_layout
-        ](tid)
-        a_shared_segment.copy_from_async(a_tile_segment)
         b_tile = b.tile[BLOCKSIZE, BLOCKSIZE](i, block_idx.x)
-        b_tile_segment = b_tile.vectorize[1, SIMD_WIDTH]().distribute[
-            thread_layout
-        ](tid)
-        b_shared_segment = b_tile_s.vectorize[1, SIMD_WIDTH]().distribute[
-            thread_layout
-        ](tid)
-        b_shared_segment.copy_from_async(b_tile_segment)
+        if thread_idx.y < a_tile.dim(0) and thread_idx.x < a_tile.dim(1):
+            a_tile_s[thread_idx.y, thread_idx.x] = a_tile[
+                thread_idx.y, thread_idx.x
+            ]
+        else:
+            a_tile_s[thread_idx.y, thread_idx.x] = Scalar[DType.bfloat16](0)
+        if thread_idx.y < b_tile.dim(0) and thread_idx.x < b_tile.dim(1):
+            b_tile_s[thread_idx.y, thread_idx.x] = b_tile[
+                thread_idx.y, thread_idx.x
+            ]
+        else:
+            b_tile_s[thread_idx.y, thread_idx.x] = Scalar[DType.bfloat16](0)
+        barrier()
 
-        async_copy_wait_all()
-
-        for k in range(a_tile_s.dim(1)):
+        for k in range(BLOCKSIZE):
             var a_val = rebind[Float32](
                 a_tile_s[thread_idx.y, k].cast[DType.float32]()
             )
@@ -89,6 +71,8 @@ def matmul_kernel[
                 b_tile_s[k, thread_idx.x].cast[DType.float32]()
             )
             c_val += a_val * b_val
+
+        barrier()
 
     if row < M and col < N:
         c[row, col] = c_val.cast[DType.bfloat16]()
@@ -121,10 +105,8 @@ def benchmark_kernel(M: Int, N: Int, K: Int, ctx: DeviceContext) raises:
     b = LayoutTensor[DType.bfloat16, Layout2D, MutAnyOrigin](d_b, b_layout)
     c = LayoutTensor[DType.bfloat16, Layout2D, MutAnyOrigin](d_c, c_layout)
 
+    comptime BLOCKSIZE = 16
     comptime kernel = matmul_kernel[BLOCKSIZE=BLOCKSIZE]
-    # Use 1D thread block for memory coalescing
-    comptime BLOCKSIZE = 32
-
     ctx.enqueue_function[kernel, kernel](
         c,
         a,
