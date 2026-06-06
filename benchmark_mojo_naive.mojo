@@ -7,8 +7,6 @@ from layout import Layout, LayoutTensor, UNKNOWN_VALUE, RuntimeLayout
 from std.testing import assert_almost_equal
 from std.utils.index import Index
 
-from std.utils.index import IndexList
-
 
 comptime Layout2D = Layout.row_major(UNKNOWN_VALUE, UNKNOWN_VALUE)
 
@@ -39,7 +37,9 @@ def matmul_kernel[
         c[row, col] = acc.cast[DType.bfloat16]()
 
 
-def benchmark_kernel(M: Int, N: Int, K: Int, ctx: DeviceContext) raises:
+def benchmark_kernel(
+    M: Int, N: Int, K: Int, num_runs: Int, num_warmup: Int, ctx: DeviceContext
+) raises:
     print(M, "x", N, "x", K)
 
     var a_layout = RuntimeLayout[Layout2D].row_major(Index(M, K))
@@ -70,7 +70,7 @@ def benchmark_kernel(M: Int, N: Int, K: Int, ctx: DeviceContext) raises:
     comptime kernel = matmul_kernel[BLOCKSIZE=BLOCKSIZE]
     # Use 1D thread block for memory coalescing
 
-    ctx.enqueue_function[kernel, kernel](
+    ctx.enqueue_function[kernel](
         c,
         a,
         b,
@@ -80,13 +80,10 @@ def benchmark_kernel(M: Int, N: Int, K: Int, ctx: DeviceContext) raises:
 
     ctx.synchronize()
 
-    comptime num_runs = 4
-    comptime num_warmup = 2
-
     @always_inline
     @parameter
     def run_kernel(ctx: DeviceContext) raises:
-        ctx.enqueue_function[kernel, kernel](
+        ctx.enqueue_function[kernel](
             c,
             a,
             b,
@@ -99,7 +96,9 @@ def benchmark_kernel(M: Int, N: Int, K: Int, ctx: DeviceContext) raises:
     ctx.synchronize()
     print("finished warmup")
 
-    var nstime = Float64(ctx.execution_time[run_kernel](num_runs)) / num_runs
+    var nstime = Float64(ctx.execution_time[run_kernel](num_runs)) / Float64(
+        num_runs
+    )
     var sectime = nstime * 1e-9
     var TFlop = 2.0 * Float64(M) * Float64(N) * Float64(K) * 1e-12
 
@@ -111,9 +110,13 @@ def benchmark_kernel(M: Int, N: Int, K: Int, ctx: DeviceContext) raises:
 def main() raises:
     args = argv()
     var size = Int(args[1] if len(args) > 1 else "4096")
+    var num_runs = Int(args[2] if len(args) > 2 else "4")
+    var num_warmup = Int(args[3] if len(args) > 3 else "2")
     M = size
     N = size
     K = size
     with DeviceContext() as ctx:
-        benchmark_kernel(M, N, K, ctx)
+        benchmark_kernel(
+            M, N, K, num_runs=num_runs, num_warmup=num_warmup, ctx=ctx
+        )
         return

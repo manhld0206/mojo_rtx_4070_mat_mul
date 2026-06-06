@@ -8,9 +8,86 @@ version = "0.1.0"
 [system-requirements]
 libc = "2.39"
 
-[tasks]
+[tasks.ncu]
+args = ["file"]
+cmd = "ncu --launch-skip 2 --set full --replay-mode application -f -o ./ncu_reports/{{ file }}.ncu-rep ./output/{{ file }} 1024 2 2"
+
+[tasks.build_cublas]
+cmd = "nvcc -O3 -arch=sm_89 -lcublas benchmark_cublas.cu -o ./output/benchmark_cublas"
+
+[tasks.run_cublas]
+cmd = "./output/benchmark_cublas"
+
+[tasks.ncu_cublas]
+depends-on = [{ task = "ncu", args = ["benchmark_cublas"] }]
+
+[tasks.build_mojo]
+args = ["file"]
+cmd = "mojo build benchmark_mojo_{{ file }}.mojo -o ./output/benchmark_mojo_{{ file }}"
+
+[tasks.run_mojo]
+args = ["file"]
+cmd = "./output/benchmark_mojo_{{ file }}"
+
+[tasks.ncu_mojo]
+args = ["file"]
+depends-on = [{ task = "ncu", args = ["benchmark_mojo_{{ file }}"] }]
+
+[tasks.build_naive_slow]
+depends-on = [{ task = "build_mojo", args = ["naive_slow"] }]
+
+[tasks.run_naive_slow]
+depends-on = [{ task = "run_mojo", args = ["naive_slow"] }]
+
+[tasks.ncu_naive_slow]
+depends-on = [{ task = "ncu_mojo", args = ["naive_slow"] }]
+
+[tasks.build_naive]
+depends-on = [{ task = "build_mojo", args = ["naive"] }]
+
+[tasks.run_naive]
+depends-on = [{ task = "run_mojo", args = ["naive"] }]
+
+[tasks.ncu_naive]
+depends-on = [{ task = "ncu_mojo", args = ["naive"] }]
+
+[tasks.build_tiling]
+depends-on = [{ task = "build_mojo", args = ["tiling"] }]
+
+[tasks.run_tiling]
+depends-on = [{ task = "run_mojo", args = ["tiling"] }]
+
+[tasks.ncu_tiling]
+depends-on = [{ task = "ncu_mojo", args = ["tiling"] }]
+
+[tasks.build_thread_coarsening]
+depends-on = [{ task = "build_mojo", args = ["thread_coarsening"] }]
+
+[tasks.run_thread_coarsening]
+depends-on = [{ task = "run_mojo", args = ["thread_coarsening"] }]
+
+[tasks.ncu_thread_coarsening]
+depends-on = [{ task = "ncu_mojo", args = ["thread_coarsening"] }]
+
+[tasks.build_all]
+depends-on = [
+    { task = "build_cublas" },
+    { task = "build_naive_slow" },
+    { task = "build_naive" },
+    { task = "build_tiling" },
+    { task = "build_thread_coarsening" },
+]
+
+[tasks.ncu_all]
+depends-on = [
+    { task = "ncu_cublas" },
+    { task = "ncu_naive_slow" },
+    { task = "ncu_naive" },
+    { task = "ncu_tiling" },
+    { task = "ncu_thread_coarsening" },
+]
 
 [dependencies]
 sysroot_linux-64 = ">=2.35"
 mojo = ">=1.0.0b1.dev2026042817,<2"
-cuda = ">=13.2.1,<14"
+cuda = ">=13.0.0,<13.1"
