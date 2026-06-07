@@ -131,7 +131,7 @@ def benchmark_kernel(
 
     comptime BM = 64
     comptime BN = 64
-    comptime BK = 64
+    comptime BK = 16
     comptime TM = 4
     comptime TN = 4
     comptime kernel = matmul_kernel[BM=BM, BN=BN, BK=BK, TM=TM, TN=TN]

@@ -210,10 +210,10 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/traitlets-5.15.1-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2025c-hc9c84f9_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-4.1.0-pyhcf101f3_0.conda
-      - conda: https://conda.modular.com/max-nightly/linux-64/mojo-1.0.0b2.dev2026060406-release.conda
-      - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.0.0b2.dev2026060406-release.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.4.0.dev2026060406-release.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-1.0.0b2.dev2026060406-release.conda
+      - conda: https://conda.modular.com/max-nightly/linux-64/mojo-1.0.0b2.dev2026060706-release.conda
+      - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.0.0b2.dev2026060706-release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.4.0.dev2026060706-release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-1.0.0b2.dev2026060706-release.conda
 packages:
 - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
   build_number: 20
@@ -2548,31 +2548,31 @@ packages:
   license_family: MIT
   size: 24190
   timestamp: 1779159948016
-- conda: https://conda.modular.com/max-nightly/linux-64/mojo-1.0.0b2.dev2026060406-release.conda
-  sha256: 1ec94557118920bf1cd5e441a2a07bb83f904d4d26ee7848e270a59097c5e999
-  md5: f820f10f396546be89cf4ccd540d0a64
+- conda: https://conda.modular.com/max-nightly/linux-64/mojo-1.0.0b2.dev2026060706-release.conda
+  sha256: 4eca4ae6bc420bcde483aa85c48ef25ad157f8dd5d7c949743415aaeea8fe5b0
+  md5: 73a7116b61e28766304d11f2b398de5e
   depends:
   - python >=3.10
-  - mojo-compiler ==1.0.0b2.dev2026060406
-  - mblack ==26.4.0.dev2026060406
+  - mojo-compiler ==1.0.0b2.dev2026060706
+  - mblack ==26.4.0.dev2026060706
   - jupyter_client >=8.6.2,<8.7
   license: LicenseRef-Modular-Proprietary
   run_exports: {}
-  size: 96802777
-  timestamp: 1780555657412
-- conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.0.0b2.dev2026060406-release.conda
-  sha256: e22a892cce602b28320537f40047a5c0c98adbc55752d92e7a3c7017fb7e4209
-  md5: a795a1954824904577ac56a29cd90721
+  size: 96794703
+  timestamp: 1780814836856
+- conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.0.0b2.dev2026060706-release.conda
+  sha256: cb206f2ddc8932834b2c477572ac50b0d6170e91b5700abd954131f96bcd40fc
+  md5: 0be6d789d0104bdc26af03af29f58a05
   depends:
-  - mojo-python ==1.0.0b2.dev2026060406
+  - mojo-python ==1.0.0b2.dev2026060706
   license: LicenseRef-Modular-Proprietary
   run_exports: {}
-  size: 92202367
-  timestamp: 1780555631633
-- conda: https://conda.modular.com/max-nightly/noarch/mblack-26.4.0.dev2026060406-release.conda
+  size: 92254633
+  timestamp: 1780814836162
+- conda: https://conda.modular.com/max-nightly/noarch/mblack-26.4.0.dev2026060706-release.conda
   noarch: python
-  sha256: 2b251ed6fd1cd60e37f593bd823f8f0ab3fbd779afd4125d61b05ab804bcd2da
-  md5: 921a2e1c9e450da43fc3c89db79d9a1f
+  sha256: 6e3806e0195df7a25d110ec49527f640135dd0a7bbb99b3fc0cc9832c195ce59
+  md5: 6e48a9abf37419ff7340f548807fb56a
   depends:
   - python >=3.10
   - click >=8.0.0
@@ -2583,15 +2583,15 @@ packages:
   - tomli >=1.1.0
   license: LicenseRef-Modular-Proprietary
   run_exports: {}
-  size: 135377
-  timestamp: 1780555399271
-- conda: https://conda.modular.com/max-nightly/noarch/mojo-python-1.0.0b2.dev2026060406-release.conda
+  size: 135393
+  timestamp: 1780814550762
+- conda: https://conda.modular.com/max-nightly/noarch/mojo-python-1.0.0b2.dev2026060706-release.conda
   noarch: python
-  sha256: 5bf0b5f14bd23f07e09b8ad4bbeb31533817eb4d2219ada8949bf820ff8679fb
-  md5: 04ee420bf3478768f636d9c5c4e00f76
+  sha256: 9ff45c87b5ddb4889bf07656aa89ff3ce8c8b1b8156d2df1d947c1b1770b7e35
+  md5: 948a16b1074a69e457b14da832fbcd90
   depends:
   - python >=3.10
   license: LicenseRef-Modular-Proprietary
   run_exports: {}
-  size: 24740
-  timestamp: 1780555399127
+  size: 24738
+  timestamp: 1780814550857
