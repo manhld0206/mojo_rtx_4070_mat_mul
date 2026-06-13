@@ -10,7 +10,7 @@ libc = "2.39"
 
 [tasks.ncu]
 args = ["file"]
-cmd = "ncu --launch-skip 2 --set full --replay-mode application -f -o ./ncu_reports/{{ file }}.ncu-rep ./output/{{ file }} 4096 2 1"
+cmd = "ncu --launch-skip 2 --set full --replay-mode application -f -o ./ncu_reports/{{ file }}.ncu-rep ./output/{{ file }} 1024 2 1"
 
 [tasks.build_cublas]
 cmd = "nvcc -O3 -arch=sm_89 -lcublas benchmark_cublas.cu -o ./output/benchmark_cublas"
