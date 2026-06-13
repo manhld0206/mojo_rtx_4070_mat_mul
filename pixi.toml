@@ -78,6 +78,15 @@ depends-on = [
     { task = "build_thread_coarsening" },
 ]
 
+[tasks.run_all]
+depends-on = [
+    { task = "run_cublas" },
+    { task = "run_naive_slow" },
+    { task = "run_naive" },
+    { task = "run_tiling" },
+    { task = "run_thread_coarsening" },
+]
+
 [tasks.ncu_all]
 depends-on = [
     { task = "ncu_cublas" },

@@ -118,22 +118,47 @@ def benchmark_kernel(
     M: Int, N: Int, K: Int, num_runs: Int, num_warmup: Int, ctx: DeviceContext
 ) raises:
     print(M, "x", N, "x", K)
+    comptime BM = 64
+    comptime BN = 64
+    comptime BK = 16
+    comptime TM = 4
+    comptime TN = 8
 
-    var a_layout = RuntimeLayout[Layout2DRow].row_major(Index(M, K))
-    var b_layout = RuntimeLayout[Layout2DRow].row_major(Index(K, N))
-    var c_layout = RuntimeLayout[Layout2DRow].row_major(Index(M, N))
+    rounded_m = BM * ceildiv(M, BM)
+    rounded_n = BN * ceildiv(N, BN)
+    rounded_k = BK * ceildiv(K, BK)
 
-    var d_a = ctx.enqueue_create_buffer[DType.float16](M * K)
-    var d_b = ctx.enqueue_create_buffer[DType.float16](K * N)
-    var d_c = ctx.enqueue_create_buffer[DType.float16](M * N)
+    var a_layout = RuntimeLayout[Layout2DRow].row_major(
+        Index(rounded_m, rounded_k)
+    )
+    var b_layout = RuntimeLayout[Layout2DRow].row_major(
+        Index(rounded_k, rounded_n)
+    )
+    var c_layout = RuntimeLayout[Layout2DRow].row_major(
+        Index(rounded_m, rounded_n)
+    )
 
-    var h_a = ctx.enqueue_create_host_buffer[DType.float16](M * K)
-    var h_b = ctx.enqueue_create_host_buffer[DType.float16](K * N)
-    var h_c = ctx.enqueue_create_host_buffer[DType.float16](M * N)
-    for i in range(M * K):
-        h_a[i] = Scalar[DType.float16](1.0)
-    for i in range(K * N):
-        h_b[i] = Scalar[DType.float16](2.0)
+    var d_a = ctx.enqueue_create_buffer[DType.float16](rounded_m * rounded_k)
+    var d_b = ctx.enqueue_create_buffer[DType.float16](rounded_k * rounded_n)
+    var d_c = ctx.enqueue_create_buffer[DType.float16](rounded_m * rounded_n)
+
+    var h_a = ctx.enqueue_create_host_buffer[DType.float16](
+        rounded_m * rounded_k
+    )
+    var h_b = ctx.enqueue_create_host_buffer[DType.float16](
+        rounded_k * rounded_n
+    )
+    var h_c = ctx.enqueue_create_host_buffer[DType.float16](
+        rounded_m * rounded_n
+    )
+    for i in range(rounded_m):
+        for j in range(rounded_k):
+            if i < M and j < K:
+                h_a[i * rounded_k + j] = Scalar[DType.float16](1.0)
+    for i in range(rounded_k):
+        for j in range(rounded_n):
+            if i < K and j < N:
+                h_b[i * rounded_n + j] = Scalar[DType.float16](2.0)
 
     h_a.enqueue_copy_to(d_a)
     h_b.enqueue_copy_to(d_b)
@@ -143,18 +168,13 @@ def benchmark_kernel(
     b = LayoutTensor[DType.float16, Layout2DRow, MutAnyOrigin](d_b, b_layout)
     c = LayoutTensor[DType.float16, Layout2DRow, MutAnyOrigin](d_c, c_layout)
 
-    comptime BM = 64
-    comptime BN = 64
-    comptime BK = 16
-    comptime TM = 4
-    comptime TN = 8
     comptime kernel = matmul_kernel[BM=BM, BN=BN, BK=BK, TM=TM, TN=TN]
     ctx.enqueue_function[kernel](
         c,
         a,
         b,
-        grid_dim=(ceildiv(N, BN), ceildiv(M, BM)),
-        block_dim=(BN / TN, BM / TM),
+        grid_dim=(ceildiv(rounded_m, BM), ceildiv(rounded_n, BN)),
+        block_dim=(BM / TM, BN / TN),
     )
 
     ctx.synchronize()
@@ -166,8 +186,8 @@ def benchmark_kernel(
             c,
             a,
             b,
-            grid_dim=(ceildiv(N, BN), ceildiv(M, BM)),
-            block_dim=(BN / TN, BM / TM),
+            grid_dim=(ceildiv(rounded_m, BM), ceildiv(rounded_n, BN)),
+            block_dim=(BM / TM, BN / TN),
         )
 
     for _ in range(num_warmup):

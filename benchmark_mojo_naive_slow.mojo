@@ -42,22 +42,43 @@ def benchmark_kernel(
     M: Int, N: Int, K: Int, num_runs: Int, num_warmup: Int, ctx: DeviceContext
 ) raises:
     print(M, "x", N, "x", K)
+    comptime BLOCKSIZE = 16
 
-    var a_layout = RuntimeLayout[Layout2DRow].row_major(Index(M, K))
-    var b_layout = RuntimeLayout[Layout2DCol].col_major(Index(K, N))
-    var c_layout = RuntimeLayout[Layout2DRow].row_major(Index(M, N))
+    rounded_m = BLOCKSIZE * ceildiv(M, BLOCKSIZE)
+    rounded_n = BLOCKSIZE * ceildiv(N, BLOCKSIZE)
+    rounded_k = BLOCKSIZE * ceildiv(K, BLOCKSIZE)
 
-    var d_a = ctx.enqueue_create_buffer[DType.float16](M * K)
-    var d_b = ctx.enqueue_create_buffer[DType.float16](K * N)
-    var d_c = ctx.enqueue_create_buffer[DType.float16](M * N)
+    var a_layout = RuntimeLayout[Layout2DRow].row_major(
+        Index(rounded_m, rounded_k)
+    )
+    var b_layout = RuntimeLayout[Layout2DCol].col_major(
+        Index(rounded_k, rounded_n)
+    )
+    var c_layout = RuntimeLayout[Layout2DRow].row_major(
+        Index(rounded_m, rounded_n)
+    )
 
-    var h_a = ctx.enqueue_create_host_buffer[DType.float16](M * K)
-    var h_b = ctx.enqueue_create_host_buffer[DType.float16](K * N)
-    var h_c = ctx.enqueue_create_host_buffer[DType.float16](M * N)
-    for i in range(M * K):
-        h_a[i] = Scalar[DType.float16](1.0)
-    for i in range(K * N):
-        h_b[i] = Scalar[DType.float16](2.0)
+    var d_a = ctx.enqueue_create_buffer[DType.float16](rounded_m * rounded_k)
+    var d_b = ctx.enqueue_create_buffer[DType.float16](rounded_k * rounded_n)
+    var d_c = ctx.enqueue_create_buffer[DType.float16](rounded_m * rounded_n)
+
+    var h_a = ctx.enqueue_create_host_buffer[DType.float16](
+        rounded_m * rounded_k
+    )
+    var h_b = ctx.enqueue_create_host_buffer[DType.float16](
+        rounded_k * rounded_n
+    )
+    var h_c = ctx.enqueue_create_host_buffer[DType.float16](
+        rounded_m * rounded_n
+    )
+    for i in range(rounded_m):
+        for j in range(rounded_k):
+            if i < M and j < K:
+                h_a[i * rounded_k + j] = Scalar[DType.float16](1.0)
+    for i in range(rounded_k):
+        for j in range(rounded_n):
+            if i < K and j < N:
+                h_b[i * rounded_n + j] = Scalar[DType.float16](2.0)
 
     h_a.enqueue_copy_to(d_a)
     h_b.enqueue_copy_to(d_b)
@@ -67,7 +88,6 @@ def benchmark_kernel(
     b = LayoutTensor[DType.float16, Layout2DCol, MutAnyOrigin](d_b, b_layout)
     c = LayoutTensor[DType.float16, Layout2DRow, MutAnyOrigin](d_c, c_layout)
 
-    comptime BLOCKSIZE = 16
     comptime kernel = matmul_kernel[BLOCKSIZE=BLOCKSIZE]
     # Use 1D thread block for memory coalescing
 
@@ -75,7 +95,7 @@ def benchmark_kernel(
         c,
         a,
         b,
-        grid_dim=(ceildiv(N, BLOCKSIZE), ceildiv(M, BLOCKSIZE)),
+        grid_dim=(ceildiv(rounded_m, BLOCKSIZE), ceildiv(rounded_n, BLOCKSIZE)),
         block_dim=(BLOCKSIZE, BLOCKSIZE),
     )
 
@@ -88,7 +108,10 @@ def benchmark_kernel(
             c,
             a,
             b,
-            grid_dim=(ceildiv(N, BLOCKSIZE), ceildiv(M, BLOCKSIZE)),
+            grid_dim=(
+                ceildiv(rounded_m, BLOCKSIZE),
+                ceildiv(rounded_n, BLOCKSIZE),
+            ),
             block_dim=(BLOCKSIZE, BLOCKSIZE),
         )
 
@@ -101,11 +124,29 @@ def benchmark_kernel(
         num_runs
     )
     var sectime = nstime * 1e-9
-    var TFlop = 2.0 * Float64(M) * Float64(N) * Float64(K) * 1e-12
+    var TFlop = (
+        2.0
+        * Float64(rounded_m)
+        * Float64(rounded_n)
+        * Float64(rounded_k)
+        * 1e-12
+    )
 
     print("  Average time: ", sectime * 1000, " ms")
     print("  Performance: ", TFlop / sectime, " TFLOPS")
     print()
+
+    h_c.enqueue_copy_from(d_c)
+    ctx.synchronize()
+    for i in range(M):
+        assert_almost_equal(
+            h_c[i].cast[DType.float32](),
+            Scalar[DType.float32](2.0 * Float32(K)),
+            "Mismatch at index "
+            + String(i)
+            + ": "
+            + String(h_c[i].cast[DType.float32]()),
+        )
 
 
 def main() raises:
