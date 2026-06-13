@@ -15,13 +15,13 @@ comptime Layout2DRow = Layout.row_major(UNKNOWN_VALUE, UNKNOWN_VALUE)
 def matmul_kernel[
     BM: Int = 64,
     BN: Int = 64,
-    BK: Int = 64,
+    BK: Int = 16,
     TM: Int = 4,
     TN: Int = 4,
 ](
-    c: LayoutTensor[DType.bfloat16, Layout2DRow, MutAnyOrigin],
-    a: LayoutTensor[DType.bfloat16, Layout2DRow, MutAnyOrigin],
-    b: LayoutTensor[DType.bfloat16, Layout2DRow, MutAnyOrigin],
+    c: LayoutTensor[DType.float16, Layout2DRow, MutAnyOrigin],
+    a: LayoutTensor[DType.float16, Layout2DRow, MutAnyOrigin],
+    b: LayoutTensor[DType.float16, Layout2DRow, MutAnyOrigin],
 ):
     var tid = thread_idx.y * block_dim.x + thread_idx.x
 
@@ -30,14 +30,14 @@ def matmul_kernel[
     K = a.dim(1)
 
     var a_s = LayoutTensor[
-        DType.bfloat16,
+        DType.float16,
         Layout.row_major(BM, BK),
         MutAnyOrigin,
         address_space=AddressSpace.SHARED,
     ].stack_allocation()
 
     var b_s = LayoutTensor[
-        DType.bfloat16,
+        DType.float16,
         Layout.row_major(BK, BN),
         MutAnyOrigin,
         address_space=AddressSpace.SHARED,
@@ -97,7 +97,7 @@ def matmul_kernel[
     comptime for row in range(TM):
         comptime for col in range(TN):
             if row < c_tile.dim(0) and col < c_tile.dim(1):
-                c_tile[row, col] = c_r[row, col].cast[DType.bfloat16]()
+                c_tile[row, col] = c_r[row, col].cast[DType.float16]()
 
 
 def benchmark_kernel(
@@ -109,25 +109,25 @@ def benchmark_kernel(
     var b_layout = RuntimeLayout[Layout2DRow].row_major(Index(K, N))
     var c_layout = RuntimeLayout[Layout2DRow].row_major(Index(M, N))
 
-    var d_a = ctx.enqueue_create_buffer[DType.bfloat16](M * K)
-    var d_b = ctx.enqueue_create_buffer[DType.bfloat16](K * N)
-    var d_c = ctx.enqueue_create_buffer[DType.bfloat16](M * N)
+    var d_a = ctx.enqueue_create_buffer[DType.float16](M * K)
+    var d_b = ctx.enqueue_create_buffer[DType.float16](K * N)
+    var d_c = ctx.enqueue_create_buffer[DType.float16](M * N)
 
-    var h_a = ctx.enqueue_create_host_buffer[DType.bfloat16](M * K)
-    var h_b = ctx.enqueue_create_host_buffer[DType.bfloat16](K * N)
-    var h_c = ctx.enqueue_create_host_buffer[DType.bfloat16](M * N)
+    var h_a = ctx.enqueue_create_host_buffer[DType.float16](M * K)
+    var h_b = ctx.enqueue_create_host_buffer[DType.float16](K * N)
+    var h_c = ctx.enqueue_create_host_buffer[DType.float16](M * N)
     for i in range(M * K):
-        h_a[i] = Scalar[DType.bfloat16](1.0)
+        h_a[i] = Scalar[DType.float16](1.0)
     for i in range(K * N):
-        h_b[i] = Scalar[DType.bfloat16](2.0)
+        h_b[i] = Scalar[DType.float16](2.0)
 
     h_a.enqueue_copy_to(d_a)
     h_b.enqueue_copy_to(d_b)
     ctx.synchronize()
 
-    a = LayoutTensor[DType.bfloat16, Layout2DRow, MutAnyOrigin](d_a, a_layout)
-    b = LayoutTensor[DType.bfloat16, Layout2DRow, MutAnyOrigin](d_b, b_layout)
-    c = LayoutTensor[DType.bfloat16, Layout2DRow, MutAnyOrigin](d_c, c_layout)
+    a = LayoutTensor[DType.float16, Layout2DRow, MutAnyOrigin](d_a, a_layout)
+    b = LayoutTensor[DType.float16, Layout2DRow, MutAnyOrigin](d_b, b_layout)
+    c = LayoutTensor[DType.float16, Layout2DRow, MutAnyOrigin](d_c, c_layout)
 
     comptime BM = 64
     comptime BN = 64
