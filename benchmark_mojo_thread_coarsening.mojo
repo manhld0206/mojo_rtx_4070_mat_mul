@@ -57,14 +57,18 @@ def matmul_kernel[
     comptime thread_layout = Layout.row_major(BM / TM, BN / TN)
 
     for i in range(ceildiv(K, BK)):
-        a_fragment = a.tile[BM, BK](block_idx.y, i).distribute[thread_layout](
-            tid
+        a_fragment = (
+            a.tile[BM, BK](block_idx.y, i)
+            .vectorize[1, 2]()
+            .distribute[thread_layout](tid)
         )
-        a_fragment_s = a_s.distribute[thread_layout](tid)
-        b_fragment = b.tile[BK, BN](i, block_idx.x).distribute[thread_layout](
-            tid
+        a_fragment_s = a_s.vectorize[1, 2]().distribute[thread_layout](tid)
+        b_fragment = (
+            b.tile[BK, BN](i, block_idx.x)
+            .vectorize[1, 2]()
+            .distribute[thread_layout](tid)
         )
-        b_fragment_s = b_s.distribute[thread_layout](tid)
+        b_fragment_s = b_s.vectorize[1, 2]().distribute[thread_layout](tid)
 
         a_fragment_s.copy_from(a_fragment)
         b_fragment_s.copy_from(b_fragment)
@@ -95,9 +99,19 @@ def matmul_kernel[
         thread_idx.y, thread_idx.x
     )
     comptime for row in range(TM):
-        comptime for col in range(TN):
-            if row < c_tile.dim(0) and col < c_tile.dim(1):
-                c_tile[row, col] = c_r[row, col].cast[DType.float16]()
+        if row < c_tile.dim(0):
+            var simd_data = SIMD[DType.float16, TN](0)
+            comptime for col in range(TN):
+                simd_data[col] = c_r[row, col].cast[DType.float16]()[0]
+            if c_tile.dim(1) == TN:
+                c_tile.aligned_store[TN](row, 0, simd_data)
+            else:
+                comptime for col in range(TN):
+                    if col < c_tile.dim(1):
+                        c_tile[row, col] = simd_data[col]
+        # comptime for col in range(TN):
+        #     if row < c_tile.dim(0) and col < c_tile.dim(1):
+        #         c_tile[row, col] = c_r[row, col].cast[DType.float16]()
 
 
 def benchmark_kernel(
@@ -133,7 +147,7 @@ def benchmark_kernel(
     comptime BN = 64
     comptime BK = 16
     comptime TM = 4
-    comptime TN = 4
+    comptime TN = 8
     comptime kernel = matmul_kernel[BM=BM, BN=BN, BK=BK, TM=TM, TN=TN]
     ctx.enqueue_function[kernel](
         c,
