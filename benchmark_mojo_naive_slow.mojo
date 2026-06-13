@@ -95,7 +95,7 @@ def benchmark_kernel(
         c,
         a,
         b,
-        grid_dim=(ceildiv(rounded_m, BLOCKSIZE), ceildiv(rounded_n, BLOCKSIZE)),
+        grid_dim=(ceildiv(rounded_n, BLOCKSIZE), ceildiv(rounded_m, BLOCKSIZE)),
         block_dim=(BLOCKSIZE, BLOCKSIZE),
     )
 
@@ -109,8 +109,8 @@ def benchmark_kernel(
             a,
             b,
             grid_dim=(
-                ceildiv(rounded_m, BLOCKSIZE),
                 ceildiv(rounded_n, BLOCKSIZE),
+                ceildiv(rounded_m, BLOCKSIZE),
             ),
             block_dim=(BLOCKSIZE, BLOCKSIZE),
         )

@@ -10,7 +10,7 @@ libc = "2.39"
 
 [tasks.ncu]
 args = ["file"]
-cmd = "ncu --launch-skip 2 --set full --replay-mode application -f -o ./ncu_reports/{{ file }}.ncu-rep ./output/{{ file }} 1024 2 2"
+cmd = "ncu --launch-skip 2 --set full --replay-mode application -f -o ./ncu_reports/{{ file }}.ncu-rep ./output/{{ file }} 4096 2 1"
 
 [tasks.build_cublas]
 cmd = "nvcc -O3 -arch=sm_89 -lcublas benchmark_cublas.cu -o ./output/benchmark_cublas"
@@ -69,6 +69,15 @@ depends-on = [{ task = "run_mojo", args = ["thread_coarsening"] }]
 [tasks.ncu_thread_coarsening]
 depends-on = [{ task = "ncu_mojo", args = ["thread_coarsening"] }]
 
+[tasks.build_bank_conflicts]
+depends-on = [{ task = "build_mojo", args = ["bank_conflicts"] }]
+
+[tasks.run_bank_conflicts]
+depends-on = [{ task = "run_mojo", args = ["bank_conflicts"] }]
+
+[tasks.ncu_bank_conflicts]
+depends-on = [{ task = "ncu_mojo", args = ["bank_conflicts"] }]
+
 [tasks.build_all]
 depends-on = [
     { task = "build_cublas" },
@@ -76,6 +85,7 @@ depends-on = [
     { task = "build_naive" },
     { task = "build_tiling" },
     { task = "build_thread_coarsening" },
+    { task = "build_bank_conflicts" },
 ]
 
 [tasks.run_all]
@@ -85,6 +95,7 @@ depends-on = [
     { task = "run_naive" },
     { task = "run_tiling" },
     { task = "run_thread_coarsening" },
+    { task = "run_bank_conflicts" },
 ]
 
 [tasks.ncu_all]
@@ -94,6 +105,7 @@ depends-on = [
     { task = "ncu_naive" },
     { task = "ncu_tiling" },
     { task = "ncu_thread_coarsening" },
+    { task = "ncu_bank_conflicts" },
 ]
 
 [dependencies]
