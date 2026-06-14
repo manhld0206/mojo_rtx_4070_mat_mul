@@ -80,7 +80,7 @@ def matmul_kernel[
 
     var a_s = LayoutTensor[
         DType.float16,
-        Layout.row_major(BM, BK),
+        Layout.row_major(BM, BK + 1),
         MutAnyOrigin,
         address_space=AddressSpace.SHARED,
     ].stack_allocation()
@@ -126,7 +126,6 @@ def matmul_kernel[
         # a_fragment_s.copy_from(a_fragment)
         # b_fragment_s.copy_from(b_fragment)
 
-
         # Copy with copy_dram_to_sram function
         # copy_dram_to_sram[thread_layout=load_a_layout, block_dim_count=2](
         #     dst=a_s,
@@ -138,7 +137,6 @@ def matmul_kernel[
         #     src=b.tile[BK, BN](i, block_idx.x),
         # )
 
-
         # Copy with manual tiling
         comptime a_sub_tiles_per_thread = ceildiv((BM * BK), NUM_THREADS)
         comptime A_TK = 2
@@ -146,20 +144,24 @@ def matmul_kernel[
 
         a_row, a_col = divmod(tid, BK / A_TK)
         a_tile = a.tile[BM, BK](block_idx.y, i).tile[A_TM, A_TK](a_row, a_col)
-        a_tile_s = a_s.tile[A_TM, A_TK](a_row, a_col)
+        # a_tile_s = a_s.tile[A_TM, A_TK](a_row, a_col)
 
         comptime for row in range(A_TM):
             if row < a_tile.dim(0):
+                a_s_row = a_row * A_TM + row
+                a_s_col = a_col * A_TK
                 if a_tile.dim(1) == A_TK:
-                    a_tile_s.aligned_store[A_TK](
-                        row, 0, a_tile.aligned_load[A_TK](row, 0)
+                    a_s.aligned_store[A_TK](
+                        a_s_row,
+                        a_s_col,
+                        a_tile.aligned_load[A_TK](row, 0),
                     )
                 else:
                     comptime for col in range(A_TK):
                         if col < a_tile.dim(1):
-                            a_tile_s[row, col] = a_tile[row, col]
+                            a_s[a_s_row, a_s_col + col] = a_tile[row, col]
                         else:
-                            a_tile_s[row, col] = 0
+                            a_s[a_s_row, a_s_col + col] = 0
 
         comptime b_sub_tiles_per_thread = ceildiv((BK * BN), NUM_THREADS)
         comptime B_TN = 2
@@ -167,20 +169,24 @@ def matmul_kernel[
 
         b_row, b_col = divmod(tid, BN / B_TN)
         b_tile = b.tile[BK, BN](i, block_idx.x).tile[B_TK, B_TN](b_row, b_col)
-        b_tile_s = b_s.tile[B_TK, B_TN](b_row, b_col)
+        # b_tile_s = b_s.tile[B_TK, B_TN](b_row, b_col)
 
         comptime for row in range(B_TK):
             if row < b_tile.dim(0):
+                b_s_row = a_row * B_TK + row
+                b_s_col = a_col * B_TN
                 if b_tile.dim(1) == B_TN:
-                    b_tile_s.aligned_store[B_TN](
-                        row, 0, b_tile.aligned_load[B_TN](row, 0)
+                    b_s.aligned_store[B_TN](
+                        b_s_row,
+                        b_s_col,
+                        b_tile.aligned_load[B_TN](row, 0),
                     )
                 else:
                     comptime for col in range(B_TN):
                         if col < b_tile.dim(1):
-                            b_tile_s[row, col] = b_tile[row, col]
+                            b_s[b_s_row, b_s_col + col] = b_tile[row, col]
                         else:
-                            b_tile_s[row, col] = 0
+                            b_s[b_s_row, b_s_col + col] = 0
 
         barrier()
 
