@@ -34,7 +34,6 @@ def _load_tile[
 ):
     """Load tile from global memory to shared memory."""
     tid = thread_idx.y * block_dim.x + thread_idx.x
-
     comptime PER_THREAD_ROW = ceildiv(
         TILE_ROW * TILE_COL, NUM_THREADS
     ) / PER_THREAD_COL
@@ -42,55 +41,18 @@ def _load_tile[
     assert TILE_COL % PER_THREAD_COL == 0
     assert TILE_ROW % PER_THREAD_ROW == 0
 
-    sub_tile_row, sub_tile_col = divmod(tid, TILE_COL / PER_THREAD_COL)
-
-    comptime if PER_THREAD_ROW != 1:
-        var dram_sub_tile = dram_tile.tile[PER_THREAD_ROW, PER_THREAD_COL](
-            sub_tile_row, sub_tile_col
-        )
-        comptime for row in range(PER_THREAD_ROW):
-            sram_tile_row = sub_tile_row * PER_THREAD_ROW + row
-            sram_tile_col = sub_tile_col * PER_THREAD_COL
-            if row < dram_sub_tile.dim(0):
-                if dram_sub_tile.dim(1) == PER_THREAD_COL:
-                    sram_tile.aligned_store[PER_THREAD_COL](
-                        sram_tile_row,
-                        sram_tile_col,
-                        dram_sub_tile.aligned_load[PER_THREAD_COL](row, 0),
-                    )
-                else:
-                    comptime for col in range(PER_THREAD_COL):
-                        if col < dram_sub_tile.dim(1):
-                            sram_tile[
-                                sram_tile_row, sram_tile_col + col
-                            ] = dram_sub_tile[row, col]
-                        else:
-                            sram_tile[sram_tile_row, sram_tile_col + col] = 0
-            else:
-                sram_tile.aligned_store[PER_THREAD_COL](
-                    sram_tile_row,
-                    sram_tile_col,
-                    SIMD[DType.float16, PER_THREAD_COL](0),
-                )
-    else:
-        var dram_sub_tile = dram_tile.flatten().tile[PER_THREAD_COL](tid)
-        sram_tile_row = sub_tile_row
-        sram_tile_col = sub_tile_col * PER_THREAD_COL
-
-        if dram_sub_tile.dim(0) == PER_THREAD_COL:
-            sram_tile.aligned_store[PER_THREAD_COL](
-                sram_tile_row,
-                sram_tile_col,
-                dram_sub_tile.aligned_load[PER_THREAD_COL](Index(0)),
-            )
-        else:
-            comptime for col in range(PER_THREAD_COL):
-                if col < dram_sub_tile.dim(0):
-                    sram_tile[
-                        sram_tile_row, sram_tile_col + col
-                    ] = dram_sub_tile[col]
-                else:
-                    sram_tile[sram_tile_row, sram_tile_col + col] = 0
+    comptime load_layout = Layout.row_major(
+        TILE_ROW / PER_THREAD_ROW, TILE_COL / PER_THREAD_COL
+    )
+    sram_fragment = (
+        sram_tile.tile[TILE_ROW, TILE_COL](0, 0)
+        .vectorize[1, PER_THREAD_COL]()
+        .distribute[load_layout](tid)
+    )
+    dram_fragment = dram_tile.vectorize[1, PER_THREAD_COL]().distribute[
+        load_layout
+    ](tid)
+    sram_fragment.copy_from(dram_fragment)
 
 
 @always_inline
@@ -221,7 +183,7 @@ def matmul_kernel[
 
     _load_tile[
         NUM_THREADS=NUM_THREADS,
-        PER_THREAD_COL=2,
+        PER_THREAD_COL=4,
         TILE_ROW=BK,
         TILE_COL=BN,
     ](
@@ -247,7 +209,7 @@ def matmul_kernel[
 
         _load_tile[
             NUM_THREADS=NUM_THREADS,
-            PER_THREAD_COL=2,
+            PER_THREAD_COL=4,
             TILE_ROW=BK,
             TILE_COL=BN,
         ](
