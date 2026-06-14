@@ -16,51 +16,6 @@ from std.utils.index import Index
 comptime Layout2DRow = Layout.row_major(UNKNOWN_VALUE, UNKNOWN_VALUE)
 
 
-@always_inline
-def load_tile[
-    num_threads: Int,
-](
-    T: UnsafePointer[Float16, _],
-    lda: Int,
-    maxRow: Int,
-    maxCol: Int,
-    T_s: UnsafePointer[
-        mut=True,
-        Scalar[DType.float16],
-        _,
-        address_space=AddressSpace.SHARED,
-    ],
-    ldas: Int,
-    height: Int,
-    width: Int,
-):
-    """Load tile from global memory to shared memory.
-
-    Args:
-        T: Pointer to global memory tile.
-        lda: Leading dimension of T (stride).
-        maxRow: Maximum valid row to load.
-        maxCol: Maximum valid column to load.
-        T_s: Pointer to shared memory tile.
-        ldas: Leading dimension of T_s (stride).
-        height: Height of tile to load.
-        width: Width of tile to load.
-    """
-    var num_rows_per_tile = num_threads // width
-    var num_subtiles = height // num_rows_per_tile
-
-    var tx = thread_idx.x
-
-    for subtile in range(num_subtiles):
-        var row, col = divmod(tx, width)
-        row += subtile * num_rows_per_tile
-
-        if row < maxRow and col < maxCol:
-            T_s[row * ldas + col] = Scalar[DType.float16](T[row * lda + col])
-        else:
-            T_s[row * ldas + col] = Scalar[DType.float16](0.0)
-
-
 def matmul_kernel[
     BM: Int = 64,
     BN: Int = 64,
