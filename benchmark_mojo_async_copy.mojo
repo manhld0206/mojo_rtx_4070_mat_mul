@@ -5,7 +5,6 @@ from std.gpu import block_dim, block_idx, thread_idx, barrier
 from std.gpu.memory import AddressSpace, async_copy_wait_all
 from std.gpu.host import DeviceContext
 from layout import Layout, LayoutTensor, UNKNOWN_VALUE, RuntimeLayout
-from layout.swizzle import ComposedLayout, make_swizzle
 from std.testing import assert_almost_equal
 from std.utils.index import Index
 
@@ -16,9 +15,9 @@ comptime Layout2DRow = Layout.row_major(UNKNOWN_VALUE, UNKNOWN_VALUE)
 @always_inline
 def _load_tile[
     NUM_THREADS: Int,
+    PER_THREAD_COL: Int,
     TILE_ROW: Int,
     TILE_COL: Int,
-    PER_THREAD_COL: Int,
 ](
     dram_tile: LayoutTensor[mut=False, DType.float16, ...],
     sram_tile: LayoutTensor[
@@ -41,13 +40,15 @@ def _load_tile[
     comptime load_layout = Layout.row_major(
         TILE_ROW / PER_THREAD_ROW, TILE_COL / PER_THREAD_COL
     )
-    sram_fragments = sram_tile.vectorize[1, PER_THREAD_COL]().distribute[
+    sram_fragment = (
+        sram_tile.tile[TILE_ROW, TILE_COL](0, 0)
+        .vectorize[1, PER_THREAD_COL]()
+        .distribute[load_layout](tid)
+    )
+    dram_fragment = dram_tile.vectorize[1, PER_THREAD_COL]().distribute[
         load_layout
     ](tid)
-    dram_fragments = dram_tile.vectorize[1, PER_THREAD_COL]().distribute[
-        load_layout
-    ](tid)
-    sram_fragments.copy_from_async(dram_fragments)
+    sram_fragment.copy_from_async(dram_fragment)
 
 
 @always_inline
@@ -123,13 +124,13 @@ def matmul_kernel[
 
     var a_s_curr = LayoutTensor[
         DType.float16,
-        Layout.row_major(BM, BK),
+        Layout.row_major(BM, BK + 2),
         MutAnyOrigin,
         address_space=AddressSpace.SHARED,
     ].stack_allocation()
     var a_s_next = LayoutTensor[
         DType.float16,
-        Layout.row_major(BM, BK),
+        Layout.row_major(BM, BK + 2),
         MutAnyOrigin,
         address_space=AddressSpace.SHARED,
     ].stack_allocation()
@@ -163,7 +164,7 @@ def matmul_kernel[
     # Prefetch first
     _load_tile[
         NUM_THREADS=NUM_THREADS,
-        PER_THREAD_COL=4,
+        PER_THREAD_COL=2,
         TILE_ROW=BM,
         TILE_COL=BK,
     ](
@@ -189,7 +190,7 @@ def matmul_kernel[
 
         _load_tile[
             NUM_THREADS=NUM_THREADS,
-            PER_THREAD_COL=4,
+            PER_THREAD_COL=2,
             TILE_ROW=BM,
             TILE_COL=BK,
         ](
@@ -231,7 +232,7 @@ def benchmark_kernel(
     comptime BN = 64
     comptime BK = 16
     comptime TM = 4
-    comptime TN = 4
+    comptime TN = 8
 
     rounded_m = BM * ceildiv(M, BM)
     rounded_n = BN * ceildiv(N, BN)
