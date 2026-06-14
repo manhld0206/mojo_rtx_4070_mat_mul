@@ -78,6 +78,24 @@ depends-on = [{ task = "run_mojo", args = ["bank_conflicts"] }]
 [tasks.ncu_bank_conflicts]
 depends-on = [{ task = "ncu_mojo", args = ["bank_conflicts"] }]
 
+[tasks.build_pipelining]
+depends-on = [{ task = "build_mojo", args = ["pipelining"] }]
+
+[tasks.run_pipelining]
+depends-on = [{ task = "run_mojo", args = ["pipelining"] }]
+
+[tasks.ncu_pipelining]
+depends-on = [{ task = "ncu_mojo", args = ["pipelining"] }]
+
+[tasks.build_async_copy]
+depends-on = [{ task = "build_mojo", args = ["async_copy"] }]
+
+[tasks.run_async_copy]
+depends-on = [{ task = "run_mojo", args = ["async_copy"] }]
+
+[tasks.ncu_async_copy]
+depends-on = [{ task = "ncu_mojo", args = ["async_copy"] }]
+
 [tasks.build_all]
 depends-on = [
     { task = "build_cublas" },
@@ -86,6 +104,8 @@ depends-on = [
     { task = "build_tiling" },
     { task = "build_thread_coarsening" },
     { task = "build_bank_conflicts" },
+    { task = "build_pipelining" },
+    { task = "build_async_copy" },
 ]
 
 [tasks.run_all]
@@ -96,6 +116,8 @@ depends-on = [
     { task = "run_tiling" },
     { task = "run_thread_coarsening" },
     { task = "run_bank_conflicts" },
+    { task = "run_pipelining" },
+    { task = "run_async_copy" },
 ]
 
 [tasks.ncu_all]
@@ -106,6 +128,8 @@ depends-on = [
     { task = "ncu_tiling" },
     { task = "ncu_thread_coarsening" },
     { task = "ncu_bank_conflicts" },
+    { task = "ncu_pipelining" },
+    { task = "ncu_async_copy" },
 ]
 
 [dependencies]

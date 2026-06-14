@@ -80,7 +80,9 @@ def matmul_kernel[
 
     var a_s = LayoutTensor[
         DType.float16,
-        Layout.row_major(BM, BK + 1),
+        # Because we are using float16
+        # Need to pad 2 elements to avoid bank conflicts
+        Layout.row_major(BM, BK + 2),
         MutAnyOrigin,
         address_space=AddressSpace.SHARED,
     ].stack_allocation()
@@ -144,7 +146,6 @@ def matmul_kernel[
 
         a_row, a_col = divmod(tid, BK / A_TK)
         a_tile = a.tile[BM, BK](block_idx.y, i).tile[A_TM, A_TK](a_row, a_col)
-        # a_tile_s = a_s.tile[A_TM, A_TK](a_row, a_col)
 
         comptime for row in range(A_TM):
             if row < a_tile.dim(0):
@@ -164,17 +165,16 @@ def matmul_kernel[
                             a_s[a_s_row, a_s_col + col] = 0
 
         comptime b_sub_tiles_per_thread = ceildiv((BK * BN), NUM_THREADS)
-        comptime B_TN = 2
+        comptime B_TN = 4
         comptime B_TK = b_sub_tiles_per_thread / B_TN
 
         b_row, b_col = divmod(tid, BN / B_TN)
         b_tile = b.tile[BK, BN](i, block_idx.x).tile[B_TK, B_TN](b_row, b_col)
-        # b_tile_s = b_s.tile[B_TK, B_TN](b_row, b_col)
 
         comptime for row in range(B_TK):
             if row < b_tile.dim(0):
-                b_s_row = a_row * B_TK + row
-                b_s_col = a_col * B_TN
+                b_s_row = b_row * B_TK + row
+                b_s_col = b_col * B_TN
                 if b_tile.dim(1) == B_TN:
                     b_s.aligned_store[B_TN](
                         b_s_row,
